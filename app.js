@@ -70,12 +70,15 @@ app.use(
     secret: 'super-duper-secret'
   })
 );
+
 app.use(express.static('public'));
+
 app.use(
   bodyParser.urlencoded({
     extended: false
   })
 );
+
 app.engine(
   '.hbs',
   exphbs({
@@ -83,58 +86,26 @@ app.engine(
     extname: '.hbs'
   })
 );
+
 app.set('view engine', '.hbs');
 
 /**
- * Store the inputs to the form in variables
- */
-
-// app.get('/home', function(req, res) {
-//   res.render('home', {
-//     data: {},
-//     errors: {}
-//   });
-// });
-
-// app.post('/home', function(req, res) {
-//   res.render('home', {
-//     data: req.body,
-//     errors: {}
-//   });
-// });
-
-app.post('/address', function(req, res) {
-  state.address = req.body;
-  console.log(state);
-  res.redirect(client.getAuthUrl());
-});
-
-/**
- * Render home page with a "Connect your car" button.
+ * Render home page
  */
 app.get('/', function(req, res, next) {
+  console.log(initMap('1355 Market St #900, San Francisco, CA 94103','200 Larkin St, San Francisco, CA 94102'));
   res.render('home', {
     authUrl: client.getAuthUrl()
   });
 });
 
 /**
- * Triggers a request to the vehicle and renders the response.
+ * Retrieve user address information and redirect to Smartcar
  */
-app.post('/request', function(req, res, next) {
-  const instance = new smartcar.Vehicle(
-    state.vehicle.id,
-    state.access.accessToken
-  );
-
-  instance
-    .location()
-    .then(({ data }) => res.render('data', { data }))
-    .catch(function(err) {
-      const message = err.message || 'Failed to get vehicle location.';
-      const action = 'fetching vehicle location';
-      return redirectToError(res, message, action);
-    });
+app.post('/address', function(req, res) {
+  state.address = req.body;
+  console.log(state);
+  res.redirect(client.getAuthUrl());
 });
 
 /**
@@ -150,34 +121,33 @@ app.get('/callback', function(req, res, next) {
 
   // Exchange authorization code for access token
   client
-    .exchangeCode(code)
-    .then(function(access) {
-      req.session = {};
-      req.session.vehicles = {};
-      req.session.access = access;
-      return res.redirect('/vehicles');
-    })
-    .catch(function(err) {
-      const message =
-        err.message || `Failed to exchange authorization code for access token`;
-      const action = 'exchanging authorization code for access token';
-      return redirectToError(res, message, action);
-    });
+  .exchangeCode(code)
+  .then(function(access) {
+    req.session = {};
+    req.session.vehicles = {};
+    req.session.access = access;
+    return res.redirect('/market');
+  })
+  .catch(function(err) {
+    const message = err.message || `Failed to exchange authorization code for access token`;
+    const action = 'exchanging authorization code for access token';
+    return redirectToError(res, message, action);
+  });
 });
 
 /**
- * Renders a list of vehicles. Lets the user select a vehicle and type of
- * request, then sends a POST request to the /request route.
+ * Display market to select delivery options
  */
-app.get('/vehicles', function(req, res, next) {
+app.get('/market', function(req, res, next) {
   const { access, vehicles } = req.session;
   state.access = access;
   if (!access) {
     return res.redirect('/');
   }
-  const { accessToken } = access;
-  smartcar.getVehicleIds(accessToken).then(function(data) {
+
+  smartcar.getVehicleIds(state.access.accessToken).then(function(data) {
     const vehicleIds = data.vehicles;
+    const accessToken = state.access.accessToken
     const vehiclePromises = vehicleIds.map(vehicleId => {
       const vehicle = new smartcar.Vehicle(vehicleId, accessToken);
       req.session.vehicles[vehicleId] = {
@@ -187,27 +157,55 @@ app.get('/vehicles', function(req, res, next) {
     });
 
     return Promise.all(vehiclePromises)
-      .then(function(data) {
-        // Add vehicle info to vehicle objects
-        _.forEach(data, vehicle => {
-          const { id: vehicleId } = vehicle;
-          req.session.vehicles[vehicleId] = vehicle;
-        });
-
-        state.vehicle =
-          req.session.vehicles[Object.keys(req.session.vehicles)[0]];
-        console.log(state);
-        res.render('vehicles', {
-          address: state.address,
-          vehicles: state.vehicles,
-          test: state.test
-        });
-      })
-      .catch(function(err) {
-        const message = err.message || 'Failed to get vehicle info.';
-        const action = 'fetching vehicle info';
-        return redirectToError(res, message, action);
+    .then(function(data) {
+      // Add vehicle info to vehicle objects
+      _.forEach(data, vehicle => {
+        const { id: vehicleId } = vehicle;
+        req.session.vehicles[vehicleId] = vehicle;
       });
+
+      // Update STATE
+      state.vehicle = req.session.vehicles[Object.keys(req.session.vehicles)[0]];
+
+      // Render
+      console.log(state);
+      res.render('market', {
+        address: state.address,
+        vehicles: state.vehicles,
+        test: state.test
+      });
+    })
+    .catch(function(err) {
+      const message = err.message || 'Failed to get vehicle info.';
+      const action = 'fetching vehicle info';
+      return redirectToError(res, message, action);
+    });
+  });
+});
+
+/**
+ * Triggers a request to the vehicle and renders the response.
+ */
+app.post('/delivery', function(req, res, next) {
+  const instance = new smartcar.Vehicle(
+    state.vehicle.id,
+    state.access.accessToken
+  );
+
+  const homeAddress = state.address.address + ', ' + state.address.city + ', ' + state.address.state + ' ' + state.address.zipcode;
+  const warehouseAddress = '1355 Market St #900, San Francisco, CA 94103';
+
+  instance
+  .location()
+  .then(function(data) {
+    return 'home'; //initMap(warehouseAddress, homeAddress, data[Object.keys(data)[0]]);
+  }).then(function(deliveryLocation) {
+    console.log(deliveryLocation);
+    return res.render('delivery', { deliveryLocation })
+  }).catch(function(err) {
+    const message = err.message || 'Failed to get vehicle location.';
+    const action = 'fetching vehicle location';
+    return redirectToError(res, message, action);
   });
 });
 
@@ -216,11 +214,9 @@ app.listen(PORT, function() {
   opn(`http://localhost:${PORT}`);
 });
 
-function initMap() {
+function initMap(warehouse, destinationHouse) {
   //Implement how to grab the addresses and turn regular addresses into coorinates
-  var warehouse = '1355 Market St #900, San Francisco, CA 94103'; //37.776801, -122.416618 Twitter HeadQuarters
   var destinationCar = new google.maps.LatLng(37.788759, -122.411561); //37.788759, -122.411561 HackBright Car
-  var destinationHouse = '200 Larkin St, San Francisco, CA 94102'; //'600 Montgomery St, San Francisco, CA 94111';//(37.794542, -122.407827) Transamerica Pyramid
 
   var service = new google.maps.DistanceMatrixService();
   service.getDistanceMatrix(
