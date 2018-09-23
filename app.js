@@ -23,18 +23,11 @@ const SMARTCAR_SECRET = envvar.string('SMARTCAR_SECRET');
 
 var state = { test: 'test' };
 
-// var publicConfig = {
-//   key: 'AIzaSyAnC8jPdJ8TBmCe2XjFtJ_pVwHB826r2YU',
-//   stagger_time: 1000, // for elevationPath
-//   encode_polylines: false,
-//   secure: true, // use https
-//   proxy: 'http://127.0.0.1:9999' // optional, set a proxy for HTTP requests
-// };
-// var gmAPI = new GoogleMapsAPI(publicConfig);
-// console.log(gmAPI);
+//Google Maps API
 
 var googleMapsClient = require('@google/maps').createClient({
-  key: 'AIzaSyAnC8jPdJ8TBmCe2XjFtJ_pVwHB826r2YU'
+  key: 'AIzaSyAnC8jPdJ8TBmCe2XjFtJ_pVwHB826r2YU',
+  Promise: Promise
 });
 
 // Validate Client ID and Secret are UUIDs
@@ -134,7 +127,22 @@ app.post('/request', function(req, res, next) {
     //.then(({ data }) => res.render('data', { data }))
     .then(({ data }) => {
       //console.log(initMap());
-      return res.render('data', { data });
+      
+      googleMapsClient
+        .distanceMatrix({
+          origins: ['San Francisco CA'],
+          destinations: ['New York NY', 'Miami FL']
+        })
+        .asPromise()
+        .then(response => {
+          data.destinationHome = response.json.rows[0].elements[0];
+          data.destinationCar = response.json.rows[0].elements[1];
+          console.log(data);
+          return res.render('data', { data });
+        })
+        .catch(err => {
+          console.log(err);
+        });
     })
     .catch(function(err) {
       const message = err.message || 'Failed to get vehicle location.';
