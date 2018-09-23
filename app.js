@@ -23,6 +23,20 @@ const SMARTCAR_SECRET = envvar.string('SMARTCAR_SECRET');
 
 var state = { test: 'test' };
 
+// var publicConfig = {
+//   key: 'AIzaSyAnC8jPdJ8TBmCe2XjFtJ_pVwHB826r2YU',
+//   stagger_time: 1000, // for elevationPath
+//   encode_polylines: false,
+//   secure: true, // use https
+//   proxy: 'http://127.0.0.1:9999' // optional, set a proxy for HTTP requests
+// };
+// var gmAPI = new GoogleMapsAPI(publicConfig);
+// console.log(gmAPI);
+
+var googleMapsClient = require('@google/maps').createClient({
+  key: 'AIzaSyAnC8jPdJ8TBmCe2XjFtJ_pVwHB826r2YU'
+});
+
 // Validate Client ID and Secret are UUIDs
 if (!validator.isUUID(SMARTCAR_CLIENT_ID)) {
   throw new Error(
