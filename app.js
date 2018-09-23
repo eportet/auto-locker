@@ -97,6 +97,13 @@ app.engine(
 app.set('view engine', '.hbs');
 
 /**
+ * Switch to confirmation page
+ */
+app.get('/confirmation', function(req, res) {
+  res.render('confirmation');
+});
+
+/**
  * Render home page
  */
 app.get('/', function(req, res, next) {
@@ -128,18 +135,19 @@ app.get('/callback', function(req, res, next) {
 
   // Exchange authorization code for access token
   client
-  .exchangeCode(code)
-  .then(function(access) {
-    req.session = {};
-    req.session.vehicles = {};
-    req.session.access = access;
-    return res.redirect('/market');
-  })
-  .catch(function(err) {
-    const message = err.message || `Failed to exchange authorization code for access token`;
-    const action = 'exchanging authorization code for access token';
-    return redirectToError(res, message, action);
-  });
+    .exchangeCode(code)
+    .then(function(access) {
+      req.session = {};
+      req.session.vehicles = {};
+      req.session.access = access;
+      return res.redirect('/market');
+    })
+    .catch(function(err) {
+      const message =
+        err.message || `Failed to exchange authorization code for access token`;
+      const action = 'exchanging authorization code for access token';
+      return redirectToError(res, message, action);
+    });
 });
 
 /**
@@ -154,7 +162,7 @@ app.get('/market', function(req, res, next) {
 
   smartcar.getVehicleIds(state.access.accessToken).then(function(data) {
     const vehicleIds = data.vehicles;
-    const accessToken = state.access.accessToken
+    const accessToken = state.access.accessToken;
     const vehiclePromises = vehicleIds.map(vehicleId => {
       const vehicle = new smartcar.Vehicle(vehicleId, accessToken);
       req.session.vehicles[vehicleId] = {
@@ -164,29 +172,30 @@ app.get('/market', function(req, res, next) {
     });
 
     return Promise.all(vehiclePromises)
-    .then(function(data) {
-      // Add vehicle info to vehicle objects
-      _.forEach(data, vehicle => {
-        const { id: vehicleId } = vehicle;
-        req.session.vehicles[vehicleId] = vehicle;
-      });
+      .then(function(data) {
+        // Add vehicle info to vehicle objects
+        _.forEach(data, vehicle => {
+          const { id: vehicleId } = vehicle;
+          req.session.vehicles[vehicleId] = vehicle;
+        });
 
-      // Update STATE
-      state.vehicle = req.session.vehicles[Object.keys(req.session.vehicles)[0]];
+        // Update STATE
+        state.vehicle =
+          req.session.vehicles[Object.keys(req.session.vehicles)[0]];
 
-      // Render
-      console.log(state);
-      res.render('market', {
-        address: state.address,
-        vehicles: state.vehicles,
-        test: state.test
+        // Render
+        console.log(state);
+        res.render('market', {
+          address: state.address,
+          vehicles: state.vehicles,
+          test: state.test
+        });
+      })
+      .catch(function(err) {
+        const message = err.message || 'Failed to get vehicle info.';
+        const action = 'fetching vehicle info';
+        return redirectToError(res, message, action);
       });
-    })
-    .catch(function(err) {
-      const message = err.message || 'Failed to get vehicle info.';
-      const action = 'fetching vehicle info';
-      return redirectToError(res, message, action);
-    });
   });
 });
 
@@ -199,34 +208,39 @@ app.post('/delivery', function(req, res, next) {
     state.access.accessToken
   );
 
-  const homeAddress = state.address.address + ', ' + state.address.city + ', ' + state.address.state + ' ' + state.address.zipcode;
+  const homeAddress =
+    state.address.address +
+    ', ' +
+    state.address.city +
+    ', ' +
+    state.address.state +
+    ' ' +
+    state.address.zipcode;
   const warehouseAddress = '1355 Market St #900, San Francisco, CA 94103';
 
   instance
     .location()
     .then(({ data }) => {
-
       googleMapsClient
         .distanceMatrix({
           origins: [warehouseAddress],
-          destinations: [homeAddress, data.latitude + ',' + data.longitude ]
+          destinations: [homeAddress, data.latitude + ',' + data.longitude]
         })
         .asPromise()
         .then(response => {
           data.destinationHome = response.json.rows[0].elements[0];
           data.destinationCar = response.json.rows[0].elements[1];
-          console.log(data);
-          let deliveryLocation = '';
-          if (data.destinationHome.duration.value > data.destinationCar.duration.value) {
-            deliveryLocation = 'car';
+          if (
+            data.destinationHome.duration.value >
+            data.destinationCar.duration.value
+          ) {
+            data.deliveryLocation = 'car';
           } else {
-            deliveryLocation = 'home';
+            data.deliveryLocation = 'home';
           }
-          return res.render('delivery', { deliveryLocation });
+          return res.render('delivery', { data });
         })
-        .catch(err => {
-          console.log(err);
-        });
+        .catch(err => {});
     })
     .catch(function(err) {
       const message = err.message || 'Failed to get vehicle location.';
