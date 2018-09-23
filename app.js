@@ -205,7 +205,7 @@ app.post('/delivery', function(req, res, next) {
   instance
     .location()
     .then(({ data }) => {
-      
+
       googleMapsClient
         .distanceMatrix({
           origins: [warehouseAddress],
@@ -216,7 +216,13 @@ app.post('/delivery', function(req, res, next) {
           data.destinationHome = response.json.rows[0].elements[0];
           data.destinationCar = response.json.rows[0].elements[1];
           console.log(data);
-          return res.render('data', { data });
+          let deliveryLocation = '';
+          if (data.destinationHome.duration.value > data.destinationCar.duration.value) {
+            deliveryLocation = 'car';
+          } else {
+            deliveryLocation = 'home';
+          }
+          return res.render('delivery', { deliveryLocation });
         })
         .catch(err => {
           console.log(err);

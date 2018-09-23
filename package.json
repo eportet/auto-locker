@@ -27,11 +27,6 @@
     "envvar": "^2.0.0",
     "express": "^4.16.3",
     "express-handlebars": "^3.0.0",
-<<<<<<< Updated upstream
-    "googlemaps": "^1.12.0",
-=======
-    "google-distance-matrix": "^1.1.1",
->>>>>>> Stashed changes
     "lodash": "^4.17.10",
     "opn": "^5.3.0",
     "smartcar": "^3.0.1",
