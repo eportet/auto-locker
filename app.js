@@ -23,6 +23,20 @@ const SMARTCAR_SECRET = envvar.string('SMARTCAR_SECRET');
 
 var state = { test: 'test' };
 
+// var publicConfig = {
+//   key: 'AIzaSyAnC8jPdJ8TBmCe2XjFtJ_pVwHB826r2YU',
+//   stagger_time: 1000, // for elevationPath
+//   encode_polylines: false,
+//   secure: true, // use https
+//   proxy: 'http://127.0.0.1:9999' // optional, set a proxy for HTTP requests
+// };
+// var gmAPI = new GoogleMapsAPI(publicConfig);
+// console.log(gmAPI);
+
+var googleMapsClient = require('@google/maps').createClient({
+  key: 'AIzaSyAnC8jPdJ8TBmCe2XjFtJ_pVwHB826r2YU'
+});
+
 // Validate Client ID and Secret are UUIDs
 if (!validator.isUUID(SMARTCAR_CLIENT_ID)) {
   throw new Error(
@@ -63,6 +77,8 @@ const client = new smartcar.AuthClient({
  */
 const app = express();
 app.use(bodyParser.json());
+app.use(express.static(__dirname + '/public'));
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(
   session({
@@ -88,20 +104,6 @@ app.set('view engine', '.hbs');
 /**
  * Store the inputs to the form in variables
  */
-
-// app.get('/home', function(req, res) {
-//   res.render('home', {
-//     data: {},
-//     errors: {}
-//   });
-// });
-
-// app.post('/home', function(req, res) {
-//   res.render('home', {
-//     data: req.body,
-//     errors: {}
-//   });
-// });
 
 app.post('/address', function(req, res) {
   state.address = req.body;
@@ -129,7 +131,11 @@ app.post('/request', function(req, res, next) {
 
   instance
     .location()
-    .then(({ data }) => res.render('data', { data }))
+    //.then(({ data }) => res.render('data', { data }))
+    .then(({ data }) => {
+      //console.log(initMap());
+      return res.render('data', { data });
+    })
     .catch(function(err) {
       const message = err.message || 'Failed to get vehicle location.';
       const action = 'fetching vehicle location';
@@ -215,71 +221,3 @@ app.listen(PORT, function() {
   console.log(`smartcar-demo server listening on port ${PORT}`);
   opn(`http://localhost:${PORT}`);
 });
-
-function initMap() {
-  //Implement how to grab the addresses and turn regular addresses into coorinates
-  var warehouse = '1355 Market St #900, San Francisco, CA 94103'; //37.776801, -122.416618 Twitter HeadQuarters
-  var destinationCar = new google.maps.LatLng(37.788759, -122.411561); //37.788759, -122.411561 HackBright Car
-  var destinationHouse = '200 Larkin St, San Francisco, CA 94102'; //'600 Montgomery St, San Francisco, CA 94111';//(37.794542, -122.407827) Transamerica Pyramid
-
-  var service = new google.maps.DistanceMatrixService();
-  service.getDistanceMatrix(
-    {
-      origins: [warehouse],
-      destinations: [destinationCar, destinationHouse],
-      travelMode: 'DRIVING',
-      //transitOptions: TransitOptions,
-      //drivingOptions: DrivingOptions,
-      unitSystem: google.maps.UnitSystem.METRIC,
-      avoidHighways: false,
-      avoidTolls: false
-    },
-    callback
-  );
-
-  function callback(response, status) {
-    let shortDist = 10000000;
-    let o;
-    let d;
-
-    if (status == 'OK') {
-      var origins = response.originAddresses;
-      var destinations = response.destinationAddresses;
-
-      for (var i = 0; i < origins.length; i++) {
-        var results = response.rows[i].elements;
-
-        for (var j = 0; j < results.length; j++) {
-          if (results[j].distance.value < shortDist) {
-            shortDist = results[j].distance.value;
-            o = origins[i];
-            d = destinations[j];
-          }
-
-          var element = results[j];
-          var distance = element.distance.text;
-          var duration = element.duration.text;
-          var from = origins[i];
-          var to = destinations[j];
-
-          console.log(
-            from + ' to ' + to + ': ' + distance + ' in ' + duration + '<br>'
-          );
-        }
-      }
-      console.log(
-        'Shortest distance is: ' +
-          shortDist +
-          ' from ' +
-          o +
-          ' to ' +
-          d +
-          '<br>'
-      ); //found which is faster
-
-      if (d == destinations[0]) return 'car';
-      //RETURN WHATEVER INSTEAD
-      else return 'house';
-    } //Find out how to return
-  }
-}
