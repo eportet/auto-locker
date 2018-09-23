@@ -97,6 +97,13 @@ app.engine(
 app.set('view engine', '.hbs');
 
 /**
+ * Switch to confirmation page
+ */
+app.get('/confirmation', function(req, res) {
+  res.render('confirmation');
+});
+
+/**
  * Render home page
  */
 app.get('/', function(req, res, next) {
