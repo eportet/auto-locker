@@ -23,6 +23,13 @@ const SMARTCAR_SECRET = envvar.string('SMARTCAR_SECRET');
 
 var state = { test: 'test' };
 
+//Google Maps API
+
+var googleMapsClient = require('@google/maps').createClient({
+  key: 'AIzaSyAnC8jPdJ8TBmCe2XjFtJ_pVwHB826r2YU',
+  Promise: Promise
+});
+
 // Validate Client ID and Secret are UUIDs
 if (!validator.isUUID(SMARTCAR_CLIENT_ID)) {
   throw new Error(
@@ -196,86 +203,33 @@ app.post('/delivery', function(req, res, next) {
   const warehouseAddress = '1355 Market St #900, San Francisco, CA 94103';
 
   instance
-  .location()
-  .then(function(data) {
-    return 'home'; //initMap(warehouseAddress, homeAddress, data[Object.keys(data)[0]]);
-  }).then(function(deliveryLocation) {
-    console.log(deliveryLocation);
-    return res.render('delivery', { deliveryLocation })
-  }).catch(function(err) {
-    const message = err.message || 'Failed to get vehicle location.';
-    const action = 'fetching vehicle location';
-    return redirectToError(res, message, action);
-  });
+    .location()
+    .then(({ data }) => {
+      
+      googleMapsClient
+        .distanceMatrix({
+          origins: [warehouseAddress],
+          destinations: [homeAddress, data.latitude + ',' + data.longitude ]
+        })
+        .asPromise()
+        .then(response => {
+          data.destinationHome = response.json.rows[0].elements[0];
+          data.destinationCar = response.json.rows[0].elements[1];
+          console.log(data);
+          return res.render('data', { data });
+        })
+        .catch(err => {
+          console.log(err);
+        });
+    })
+    .catch(function(err) {
+      const message = err.message || 'Failed to get vehicle location.';
+      const action = 'fetching vehicle location';
+      return redirectToError(res, message, action);
+    });
 });
 
 app.listen(PORT, function() {
   console.log(`smartcar-demo server listening on port ${PORT}`);
   opn(`http://localhost:${PORT}`);
 });
-
-function initMap(warehouse, destinationHouse) {
-  //Implement how to grab the addresses and turn regular addresses into coorinates
-  var destinationCar = new google.maps.LatLng(37.788759, -122.411561); //37.788759, -122.411561 HackBright Car
-
-  var service = new google.maps.DistanceMatrixService();
-  service.getDistanceMatrix(
-    {
-      origins: [warehouse],
-      destinations: [destinationCar, destinationHouse],
-      travelMode: 'DRIVING',
-      //transitOptions: TransitOptions,
-      //drivingOptions: DrivingOptions,
-      unitSystem: google.maps.UnitSystem.METRIC,
-      avoidHighways: false,
-      avoidTolls: false
-    },
-    callback
-  );
-
-  function callback(response, status) {
-    let shortDist = 10000000;
-    let o;
-    let d;
-
-    if (status == 'OK') {
-      var origins = response.originAddresses;
-      var destinations = response.destinationAddresses;
-
-      for (var i = 0; i < origins.length; i++) {
-        var results = response.rows[i].elements;
-
-        for (var j = 0; j < results.length; j++) {
-          if (results[j].distance.value < shortDist) {
-            shortDist = results[j].distance.value;
-            o = origins[i];
-            d = destinations[j];
-          }
-
-          var element = results[j];
-          var distance = element.distance.text;
-          var duration = element.duration.text;
-          var from = origins[i];
-          var to = destinations[j];
-
-          console.log(
-            from + ' to ' + to + ': ' + distance + ' in ' + duration + '<br>'
-          );
-        }
-      }
-      console.log(
-        'Shortest distance is: ' +
-          shortDist +
-          ' from ' +
-          o +
-          ' to ' +
-          d +
-          '<br>'
-      ); //found which is faster
-
-      if (d == destinations[0]) return 'car';
-      //RETURN WHATEVER INSTEAD
-      else return 'house';
-    } //Find out how to return
-  }
-}
