@@ -235,6 +235,40 @@ app.post('/delivery', function(req, res, next) {
     });
 });
 
+app.get('/driver', function(req, res) {
+  res.render('driver');
+});
+
+app.post('/unlock', function(req, res){
+  const instance = new smartcar.Vehicle(
+    state.vehicle.id,
+    state.access.accessToken
+  );
+
+  instance.unlock()
+  .catch(function(err) {
+    const message = err.message || 'Failed to send unlock request to vehicle.';
+    const action = 'unlocking vehicle';
+    return redirectToError(res, message, action);
+  });
+  res.redirect('/driver');
+});
+
+app.post('/lock', function(req, res) {
+  const instance = new smartcar.Vehicle(
+    state.vehicle.id,
+    state.access.accessToken
+  );
+
+  instance.lock()
+  .catch(function(err) {
+    const message = err.message || 'Failed to send lock request to vehicle.';
+    const action = 'locking vehicle';
+    return redirectToError(res, message, action);
+  });
+  res.redirect('/driver');
+});
+
 app.listen(PORT, function() {
   console.log(`smartcar-demo server listening on port ${PORT}`);
   opn(`http://localhost:${PORT}`);
